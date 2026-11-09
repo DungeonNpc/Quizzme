@@ -2,9 +2,8 @@ from pypdf import PdfReader
 from dataclasses import dataclass
 from pathlib import Path
 
-
-
 MIN_CHARS = 100
+MIN_TOTAL_CHARS = 200
 
 @dataclass
 class Chunk:
@@ -50,9 +49,12 @@ def ingest(path):
     if suffix == '.pdf':
         pages = extract_pages(path)
     elif suffix == '.txt':
-        pages = [(1 ,clean(Path(path).read_text(encoding="utf-8")))]
+        pages = [(1,clean(Path(path).read_text(encoding="utf-8")))]
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
+    total = sum(len(text) for _, text in pages)
+    if total < MIN_TOTAL_CHARS:
+        raise ValueError("No readable text found. The file may be a scanned PDF.")
     chunks = chunk_pages(pages)
     return chunks
 
@@ -69,15 +71,30 @@ if __name__ == "__main__":
     print([(c.page, len(c.text)) for c in chunk_pages(fake_pages, 200)])
 
     # ingest: pdf
-    chunks = ingest("eval/docs/Linux cheatsheet.pdf")
-    print(len(chunks), [c.page for c in chunks])
+    try:
+        chunks = ingest("eval/docs/Linux cheatsheet.pdf")
+        print(len(chunks), [c.page for c in chunks])
+    except Exception as e:
+        print("pdf FAILED:", e)
 
     # ingest: txt
-    chunks = ingest("eval/docs/test.txt")
-    print(len(chunks), chunks[0])
+    try:
+        print("test.txt length:", len(Path("eval/docs/test.txt").read_text(encoding="utf-8")))
+        chunks = ingest("eval/docs/test.txt")
+        print(len(chunks), chunks[0])
+    except Exception as e:
+        print("txt FAILED:", e)
 
     # ingest: unsupported type
     try:
         ingest("eval/docs/fake.docx")
+        print("docx FAILED: no error was raised")
+    except ValueError as e:
+        print("caught:", e)
+
+    # ingest: empty file
+    try:
+        ingest("eval/docs/empty.txt")
+        print("empty FAILED: no error was raised")
     except ValueError as e:
         print("caught:", e)
