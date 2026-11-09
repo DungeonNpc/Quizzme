@@ -1,8 +1,15 @@
 from typing import Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+
 
 class MCQQuestion(BaseModel):
-    type: Literal["MCQ"]
+    @model_validator(mode="after")
+    def check_correct_option(self):
+        if self.correct_option not in self.options:
+            raise ValueError(f"correct_option {self.correct_option!r} is not in options")
+        return self
+    
+    type: Literal["mcq"]
     difficulty: Literal["recall", "understand", "apply"]
     id: str
     question: str
@@ -23,8 +30,9 @@ class ShortQuestion(BaseModel):
     source_quote: str
 
 if __name__ == "__main__":
+    
     q = MCQQuestion(
-        type="MCQ",
+        type="mcq",
         difficulty="recall",
         id="q1",
         question="What does ls do?",
@@ -49,3 +57,15 @@ if __name__ == "__main__":
     print(s.question)
     for point in s.rubric:
         print("-", point)
+
+    try:
+        MCQQuestion(
+            type="mcq", difficulty="recall", id="q9",
+            question="Test?",
+            options={"A": "x", "B": "y"},
+            correct_option="Z",
+            explanation="...", source_page=1, source_quote="...",
+        )
+        print("validator FAILED: no error was raised")
+    except Exception as e:
+        print("caught:", e)
