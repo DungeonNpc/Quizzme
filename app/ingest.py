@@ -1,6 +1,8 @@
 from pypdf import PdfReader
 from dataclasses import dataclass
 
+MIN_CHARS = 100
+
 @dataclass
 class Chunk:
     text: str
@@ -36,10 +38,12 @@ def chunk_pages(pages, max_chars: int = 3000):
     chunks = []
     for page_num, text in pages:
         for piece in split_text(text, max_chars):
-            chunks.append(Chunk(text = piece, page = page_num))
+            if len(piece) >= MIN_CHARS:   
+                chunks.append(Chunk(text = piece, page = page_num))
     return chunks
 
 if __name__ == "__main__":
-    fake_pages = [(1, "one two three four five six"), (2, "seven eight nine")]
-    for c in chunk_pages(fake_pages, 10):
-        print(c.page, c.text)
+    pages = extract_pages("eval/docs/Linux cheatsheet.pdf")
+    chunks = chunk_pages(pages, 500)
+    print(len(chunks))
+    print([c.text for c in chunks])
