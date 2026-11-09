@@ -56,6 +56,8 @@ def ingest(path):
     if total < MIN_TOTAL_CHARS:
         raise ValueError("No readable text found. The file may be a scanned PDF.")
     chunks = chunk_pages(pages)
+    if not chunks:
+        raise ValueError(f"No chunk reached {MIN_CHARS} characters. The document may be too fragmented.")
     return chunks
 
 if __name__ == "__main__":
