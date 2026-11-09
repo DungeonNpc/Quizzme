@@ -77,5 +77,24 @@ PASSAGE (page {page}):
 {text}
 >>>
 """
+
+def clean_json(text):
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.removeprefix("```json")
+        text = text.removeprefix("```")
+    if text.endswith("```"):
+        text = text.removesuffix("```")
+    return text.strip()
+
+
 if __name__ == "__main__":
     print(build_user_prompt("x", 1, 1, "apply"))
+    tests = [
+        '{"a": 1}',
+        '  {"a": 1}  ',
+        '```json\n{"a": 1}\n```',
+        '```\n{"a": 1}\n```',
+    ]
+    for t in tests:
+        print(repr(clean_json(t)))    
