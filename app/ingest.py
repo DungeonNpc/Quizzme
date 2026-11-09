@@ -42,8 +42,13 @@ def chunk_pages(pages, max_chars: int = 3000):
                 chunks.append(Chunk(text = piece, page = page_num))
     return chunks
 
+def ingest(path):
+    pages = extract_pages(path)
+    chunks = chunk_pages(pages)
+    return chunks
+
 if __name__ == "__main__":
-    pages = extract_pages("eval/docs/Linux cheatsheet.pdf")
-    chunks = chunk_pages(pages, 500)
+    chunks = ingest("eval/docs/Linux cheatsheet.pdf")
     print(len(chunks))
-    print([c.text for c in chunks])
+    print(chunks[0])
+    print([c.page for c in chunks])
