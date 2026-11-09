@@ -1,5 +1,8 @@
 from pypdf import PdfReader
 from dataclasses import dataclass
+from pathlib import Path
+
+
 
 MIN_CHARS = 100
 
@@ -43,12 +46,38 @@ def chunk_pages(pages, max_chars: int = 3000):
     return chunks
 
 def ingest(path):
-    pages = extract_pages(path)
+    suffix = Path(path).suffix.lower()
+    if suffix == '.pdf':
+        pages = extract_pages(path)
+    elif suffix == '.txt':
+        pages = [(1 ,clean(Path(path).read_text(encoding="utf-8")))]
+    else:
+        raise ValueError(f"Unsupported file type: {suffix}")
     chunks = chunk_pages(pages)
     return chunks
 
 if __name__ == "__main__":
+    # split_text
+    print(split_text("one two three four five six", 10))
+    print(split_text("short", 10))
+    print(split_text("", 10))
+    print(split_text("abcdefghijklmnopqrstuvwxyz", 10))
+    print(split_text("abcdefghij", 10))
+
+    # chunk_pages (MIN_CHARS filter)
+    fake_pages = [(1, "a" * 150), (2, "short text")]
+    print([(c.page, len(c.text)) for c in chunk_pages(fake_pages, 200)])
+
+    # ingest: pdf
     chunks = ingest("eval/docs/Linux cheatsheet.pdf")
-    print(len(chunks))
-    print(chunks[0])
-    print([c.page for c in chunks])
+    print(len(chunks), [c.page for c in chunks])
+
+    # ingest: txt
+    chunks = ingest("eval/docs/test.txt")
+    print(len(chunks), chunks[0])
+
+    # ingest: unsupported type
+    try:
+        ingest("eval/docs/fake.docx")
+    except ValueError as e:
+        print("caught:", e)

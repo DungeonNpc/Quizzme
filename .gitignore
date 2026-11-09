@@ -4,3 +4,6 @@ __pycache__/
 venv/
 .venv/
 *.db
+eval/docs/*.pdf
+eval/docs/*.txt
+eval/docs/*.docx
