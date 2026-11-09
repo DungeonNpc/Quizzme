@@ -34,20 +34,38 @@ Question = Annotated[Union[MCQQuestion, ShortQuestion], Field(discriminator="typ
 class Quiz(BaseModel):
     questions: list[Question]
 
+class GradeResult(BaseModel):
+    question_id: str
+    score: float = Field(ge=0, le=1)
+    verdict: Literal["correct", "partially_correct", "incorrect"]
+    feedback: str
+    correct_answer: str
+    rubric_hits: list[bool]
+
 if __name__ == "__main__":
 
-    raw = """
-    {"questions": [
-      {"type": "essay", "difficulty": "recall", "id": "q1", "question": "What does ls do?",
-       "options": {"A": "List files", "B": "Delete files"}, "correct_option": "A",
-       "explanation": "ls lists contents.", "source_page": 2, "source_quote": "ls list files"},
-      {"type": "short", "difficulty": "understand", "id": "q2", "question": "Explain cd.",
-       "reference_answer": "Changes directory.", "rubric": ["says it changes directory"],
-       "source_page": 3, "source_quote": "cd change folder"}
-    ]}
-    """
-    quiz = Quiz.model_validate_json(raw)
-    print([type(q).__name__ for q in quiz.questions])   
+    g = GradeResult(
+        question_id="q2",
+        score=0.5,
+        verdict="partially_correct",
+        feedback="You covered the directory change but missed the working directory part.",
+        correct_answer="cd changes the current working directory.",
+        rubric_hits=[True, "False"],
+    )
+    print(g.verdict, g.rubric_hits)
+
+    # raw = """
+    # {"questions": [
+    #   {"type": "mcq", "difficulty": "recall", "id": "q1", "question": "What does ls do?",
+    #    "options": {"A": "List files", "B": "Delete files"}, "correct_option": "A",
+    #    "explanation": "ls lists contents.", "source_page": 2, "source_quote": "ls list files"},
+    #   {"type": "short", "difficulty": "understand", "id": "q2", "question": "Explain cd.",
+    #    "reference_answer": "Changes directory.", "rubric": ["says it changes directory"],
+    #    "source_page": 3, "source_quote": "cd change folder"}
+    # ]}
+    # """
+    # quiz = Quiz.model_validate_json(raw)
+    # print([type(q).__name__ for q in quiz.questions])   
     
     # q = MCQQuestion(
     #     type="mcq",
