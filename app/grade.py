@@ -80,11 +80,32 @@ def grade_short(question, user_answer):
             rubric_hits=[False] * len(question.rubric)
         )
     prompt = build_grading_prompt(question, user_answer)
-    reply = call_llm(GRADER_PROMPT, prompt, 0.0)
-    judgement = RubricJudgement.model_validate_json(clean_json(reply))
+    judgement = None
+    for _ in range(2):
+        reply = call_llm(GRADER_PROMPT, prompt, 0.0)
+        try:
+            candidate = RubricJudgement.model_validate_json(clean_json(reply))
+            if len(candidate.rubric_hits) != len(question.rubric):
+                raise ValueError(f"Grader returned {len(candidate.rubric_hits)} judgements for {len(question.rubric)} rubric points.")
+            judgement = candidate
+            break
+        except ValueError as e:
+            prompt = f"""
+ORIGINAL TASK:
+{prompt}
+
+YOUR PREVIOUS REPLY:
+{reply}
+
+ERROR:
+{str(e)[:1500]}
+
+Fix the problems above. Return the corrected JSON only, with no other text.
+"rubric_hits" must contain exactly {len(question.rubric)} true/false values, one per rubric point, in order.
+"""
+    if judgement is None:
+        raise ValueError("The grader returned an invalid judgement twice.")
     hits = judgement.rubric_hits
-    if len(hits) != len(question.rubric):
-        raise ValueError(f'Grader returned {len(hits)} judgements for {len(question.rubric)} rubric points.')
     score = sum(hits) / len(hits)
     if score == 1:
         verdict = "correct"
@@ -103,6 +124,7 @@ def grade_short(question, user_answer):
 
 if __name__ == "__main__":
 
+
     s = ShortQuestion(
         type="short", difficulty="understand", id="q2",
         question="Explain what cd does.",
@@ -110,25 +132,66 @@ if __name__ == "__main__":
         rubric=["says it changes directory", "mentions the working directory"],
         source_page=3, source_quote="cd change folder",
     )
-    replies = [
-        '{"rubric_hits": [true, false], "feedback": "Good start."}',
-        '{"rubric_hits": [true, true], "feedback": "Perfect."}',
-        '{"rubric_hits": [false, false], "feedback": "Missing both."}',
-        '{"rubric_hits": [true], "feedback": "Wrong length."}',
-    ]
+
+    calls = []
 
     def fake(system, user, temperature=0.3):
+        calls.append(user)
         return replies.pop(0)
 
     call_llm = fake
-    for a in ["it changes the folder", "changes the current working directory", "no idea", "x"]:
-        try:
-            r = grade_short(s, a)
-            print(r.verdict, r.score, r.rubric_hits)
-        except ValueError as e:
-            print("caught:", e)
-    r = grade_short(s, "   ")
-    print(r.verdict, r.score, r.rubric_hits)
+    good = '{"rubric_hits": [true, false], "feedback": "Good start."}'
+
+    replies = [good]
+    r = grade_short(s, "it changes the folder")
+    print(r.verdict, len(calls), "call(s)")
+
+    calls.clear()
+    replies = ["not json", good]
+    r = grade_short(s, "it changes the folder")
+    print(r.verdict, len(calls), "call(s)")
+
+    calls.clear()
+    replies = ['{"rubric_hits": [true], "feedback": "x"}', good]
+    r = grade_short(s, "it changes the folder")
+    print(r.verdict, len(calls), "call(s)")
+
+    calls.clear()
+    replies = ['{"rubric_hits": [true], "feedback": "x"}', "not json"]
+    try:
+        grade_short(s, "it changes the folder")
+    except ValueError as e:
+        print("caught:", e)
+
+
+
+    # s = ShortQuestion(
+    #     type="short", difficulty="understand", id="q2",
+    #     question="Explain what cd does.",
+    #     reference_answer="cd changes the current working directory.",
+    #     rubric=["says it changes directory", "mentions the working directory"],
+    #     source_page=3, source_quote="cd change folder",
+    # )
+    # replies = [
+    #     '{"rubric_hits": [true, false], "feedback": "Good start."}',
+    #     '{"rubric_hits": [true, true], "feedback": "Perfect."}',
+    #     '{"rubric_hits": [false, false], "feedback": "Missing both."}',
+    #     '{"rubric_hits": [true], "feedback": "Wrong length."}',
+    # ]
+
+    # def fake(system, user, temperature=0.3):
+    #     return replies.pop(0)
+
+    # call_llm = fake
+    # for a in ["it changes the folder", "changes the current working directory", "no idea", "x"]:
+    #     try:
+    #         r = grade_short(s, a)
+    #         print(r.verdict, r.score, r.rubric_hits)
+    #     except ValueError as e:
+    #         print("caught:", e)
+    # r = grade_short(s, "   ")
+    # print(r.verdict, r.score, r.rubric_hits)
+
 
     # s = ShortQuestion(
     #     type="short", difficulty="understand", id="q2",
