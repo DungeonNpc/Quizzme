@@ -2,7 +2,10 @@ from app.llm import call_llm
 from app.models import Quiz
 from app.ingest import ingest, clean
 from pydantic import ValidationError
+from math import ceil
 
+QUESTIONS_PER_CHUNK = 2   
+MAX_PER_CHUNK = 3       
 
 SYSTEM_PROMPT = """
 You write quiz questions from a passage of study material.
@@ -124,18 +127,37 @@ Fix the problems above. Return the corrected JSON only, with no other text.
     raise ValueError("The model returned invalid questions twice.")
 
 
-
-
-
-chunks = ingest("eval/docs/Linux cheatsheet.pdf")
-quiz = generate_quiz(chunks[2], n_questions=4, difficulty="understand")
-print(len(quiz.questions), "verified questions")
-for q in quiz.questions:
-    print(q.type, q.id, q.question)
-    print("   quote:", q.source_quote)
+def generate_test(chunks, n_questions = 10, difficulty = "recall", skip_first=False):
+    if not chunks:
+        raise ValueError("No chunks to generate from.")
+    pool = chunks[1:] if skip_first and len(chunks) > 1 else chunks
+    n_questions = min(n_questions, len(pool) * MAX_PER_CHUNK)
+    k = ceil(n_questions / QUESTIONS_PER_CHUNK)
+    k = min(k, len(pool))
+    indices = [int(i * len(pool) / k) for i in range(k)]
+    per_chunk = ceil(n_questions / k)
+    all_questions = []
+    for i in indices:
+        try:
+            quiz = generate_quiz(pool[i], per_chunk, difficulty)
+            all_questions.extend(quiz.questions)
+        except ValueError:
+            continue
+    # all_questions = all_questions[:n_questions]
+    if not all_questions:
+        raise ValueError("No valid questions could be generated from this document.")
+    for i, q in enumerate(all_questions, start=1):
+        q.id = f"q{i}"
+    return Quiz(questions=all_questions)
 
 
 # if __name__ == "__main__":
+#     chunks = ingest("eval/docs/Linux cheatsheet.pdf")
+#     test = generate_test(chunks, n_questions=14, difficulty="understand", skip_first=True)
+#     print(len(test.questions), "questions")
+#     for q in test.questions:
+#         print(q.id, q.type, "p." + str(q.source_page), q.question)
+
 #     text = "ls lists files. cd changes directory."
 #     print(quote_in_text("ls lists files", text))
 #     print(quote_in_text("LS   lists   files", text))
