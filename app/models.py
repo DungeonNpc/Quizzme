@@ -2,6 +2,8 @@ from typing import Annotated, Union, Literal
 from pydantic import BaseModel, Field, model_validator
 
 
+
+
 class MCQQuestion(BaseModel):
     @model_validator(mode="after")
     def check_correct_option(self):
@@ -41,6 +43,10 @@ class GradeResult(BaseModel):
     feedback: str
     correct_answer: str
     rubric_hits: list[bool] = []
+
+class RubricJudgement(BaseModel):
+    rubric_hits: list[bool]
+    feedback: str
 
 if __name__ == "__main__":
 
