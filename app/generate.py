@@ -1,6 +1,6 @@
 from app.llm import call_llm
 from app.models import Quiz
-from app.ingest import ingest
+from app.ingest import ingest, clean
 from pydantic import ValidationError
 
 
@@ -90,12 +90,24 @@ def clean_json(text):
         text = text.removesuffix("```")
     return text.strip()
 
+def normalize(text):
+    return clean(text.lower())
+
+def quote_in_text(quote, text):
+    quote = normalize(quote)
+    text = normalize(text)
+    if not quote:
+        return False
+    return quote in text
+
 def generate_quiz(chunk, n_questions=3, difficulty="recall", n_short=1):
     user = build_user_prompt(chunk.text, chunk.page, n_questions, difficulty, n_short)
     for attempt in range(2):
         reply = call_llm(SYSTEM_PROMPT, user)
         try:
-            return Quiz.model_validate_json(clean_json(reply))
+            quiz = Quiz.model_validate_json(clean_json(reply))
+            quiz.questions = [q for q in quiz.questions if quote_in_text(q.source_quote, chunk.text)]
+            return quiz
         except ValidationError as e:
             user = f"""
 ORIGINAL TASK:
@@ -112,38 +124,55 @@ Fix the problems above. Return the corrected JSON only, with no other text.
     raise ValueError("The model returned invalid questions twice.")
 
 
-if __name__ == "__main__":
-    RUN_REAL = False   # set to True for one real API call
 
-    from app.ingest import Chunk, ingest
 
-    if RUN_REAL:
-        chunks = ingest("eval/docs/Linux cheatsheet.pdf")
-        quiz = generate_quiz(chunks[2], n_questions=4, difficulty="understand")
-        for q in quiz.questions:
-            print(q.type, q.id, q.question)
-    else:
-        good = '{"questions": [{"type": "mcq", "difficulty": "recall", "id": "q1", "question": "Q?", "options": {"A": "x", "B": "y"}, "correct_option": "A", "explanation": "e", "source_page": 1, "source_quote": "s"}]}'
-        calls = []
 
-        def fake(system, user, temperature=0.3):
-            calls.append(user)
-            return replies.pop(0)
+chunks = ingest("eval/docs/Linux cheatsheet.pdf")
+quiz = generate_quiz(chunks[2], n_questions=4, difficulty="understand")
+print(len(quiz.questions), "verified questions")
+for q in quiz.questions:
+    print(q.type, q.id, q.question)
+    print("   quote:", q.source_quote)
 
-        call_llm = fake
-        chunk = Chunk(text="ls lists files.", page=1)
 
-        replies = [good]
-        print(len(generate_quiz(chunk).questions), "questions,", len(calls), "call(s)")
+# if __name__ == "__main__":
+#     text = "ls lists files. cd changes directory."
+#     print(quote_in_text("ls lists files", text))
+#     print(quote_in_text("LS   lists   files", text))
+#     print(quote_in_text("rm removes files", text))
+#     print(quote_in_text("", text))
+#     print(quote_in_text("   ", text))
+    # RUN_REAL = False   # set to True for one real API call
 
-        calls.clear()
-        replies = ["not json", good]
-        print(len(generate_quiz(chunk).questions), "questions,", len(calls), "call(s)")
-        print(calls[1][:400])
+    # from app.ingest import Chunk, ingest
 
-        calls.clear()
-        replies = ["not json", "still not json"]
-        try:
-            generate_quiz(chunk)
-        except ValueError as e:
-            print("caught:", e)
+    # if RUN_REAL:
+    #     chunks = ingest("eval/docs/Linux cheatsheet.pdf")
+    #     quiz = generate_quiz(chunks[2], n_questions=4, difficulty="understand")
+    #     for q in quiz.questions:
+    #         print(q.type, q.id, q.question)
+    # else:
+    #     good = '{"questions": [{"type": "mcq", "difficulty": "recall", "id": "q1", "question": "Q?", "options": {"A": "x", "B": "y"}, "correct_option": "A", "explanation": "e", "source_page": 1, "source_quote": "s"}]}'
+    #     calls = []
+
+    #     def fake(system, user, temperature=0.3):
+    #         calls.append(user)
+    #         return replies.pop(0)
+
+    #     call_llm = fake
+    #     chunk = Chunk(text="ls lists files.", page=1)
+
+    #     replies = [good]
+    #     print(len(generate_quiz(chunk).questions), "questions,", len(calls), "call(s)")
+
+    #     calls.clear()
+    #     replies = ["not json", good]
+    #     print(len(generate_quiz(chunk).questions), "questions,", len(calls), "call(s)")
+    #     print(calls[1][:400])
+
+    #     calls.clear()
+    #     replies = ["not json", "still not json"]
+    #     try:
+    #         generate_quiz(chunk)
+    #     except ValueError as e:
+    #         print("caught:", e)
