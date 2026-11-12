@@ -143,7 +143,7 @@ def generate_test(chunks, n_questions = 10, difficulty = "recall", skip_first=Fa
             all_questions.extend(quiz.questions)
         except ValueError:
             continue
-    # all_questions = all_questions[:n_questions]
+    all_questions = all_questions[:n_questions]
     if not all_questions:
         raise ValueError("No valid questions could be generated from this document.")
     for i, q in enumerate(all_questions, start=1):
