@@ -27,7 +27,7 @@ class ShortQuestion(BaseModel):
     id: str
     question: str
     reference_answer: str
-    rubric: list[str]
+    rubric: list[str] = Field(min_length=2, max_length=4)
     source_page: int
     source_quote: str
 
@@ -50,6 +50,18 @@ class RubricJudgement(BaseModel):
 
 if __name__ == "__main__":
 
+    for n in (1, 2, 4, 5):
+        try:
+            ShortQuestion(
+                type="short", difficulty="recall", id="t",
+                question="Q?", reference_answer="A.",
+                rubric=["point"] * n,
+                source_page=1, source_quote="s",
+            )
+            print(n, "points: ok")
+        except Exception as e:
+            print(n, "points: rejected")
+
     g = GradeResult(
         question_id="q2",
         score=0.5,
@@ -66,7 +78,7 @@ if __name__ == "__main__":
        "options": {"A": "List files", "B": "Delete files"}, "correct_option": "A",
        "explanation": "ls lists contents.", "source_page": 2, "source_quote": "ls list files"},
       {"type": "short", "difficulty": "understand", "id": "q2", "question": "Explain cd.",
-       "reference_answer": "Changes directory.", "rubric": ["says it changes directory"],
+       "reference_answer": "Changes directory.", "rubric": ["says it changes directory", "mentions the working directory"],
        "source_page": 3, "source_quote": "cd change folder"}
     ]}
     """
