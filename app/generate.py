@@ -113,7 +113,7 @@ def shuffle_options(q):
     for letter, text in q.options.items():
         if text == correct_text:
             q.correct_option = letter
-            
+
 def generate_quiz(chunk, n_questions=3, difficulty="recall", n_short=1):
     user = build_user_prompt(chunk.text, chunk.page, n_questions, difficulty, n_short)
     for attempt in range(2):
@@ -121,6 +121,9 @@ def generate_quiz(chunk, n_questions=3, difficulty="recall", n_short=1):
         try:
             quiz = Quiz.model_validate_json(clean_json(reply))
             quiz.questions = [q for q in quiz.questions if quote_in_text(q.source_quote, chunk.text)]
+            for q in quiz.questions:
+                if q.type == "mcq":
+                    shuffle_options(q)
             return quiz
         except ValidationError as e:
             user = f"""
