@@ -3,6 +3,8 @@ from app.models import Quiz
 from app.ingest import ingest, clean
 from pydantic import ValidationError
 from math import ceil
+from random import shuffle
+from string import ascii_uppercase
 
 QUESTIONS_PER_CHUNK = 2   
 MAX_PER_CHUNK = 3       
@@ -103,6 +105,15 @@ def quote_in_text(quote, text):
         return False
     return quote in text
 
+def shuffle_options(q):
+    correct_text = q.options[q.correct_option]
+    texts = list(q.options.values())
+    shuffle(texts)
+    q.options = {letter: text for letter, text in zip(ascii_uppercase, texts)}
+    for letter, text in q.options.items():
+        if text == correct_text:
+            q.correct_option = letter
+            
 def generate_quiz(chunk, n_questions=3, difficulty="recall", n_short=1):
     user = build_user_prompt(chunk.text, chunk.page, n_questions, difficulty, n_short)
     for attempt in range(2):
@@ -151,7 +162,26 @@ def generate_test(chunks, n_questions = 10, difficulty = "recall", skip_first=Fa
     return Quiz(questions=all_questions)
 
 
-# if __name__ == "__main__":
+
+
+
+if __name__ == "__main__":
+
+    from collections import Counter
+    from app.models import MCQQuestion
+
+    q = MCQQuestion(
+        type="mcq", difficulty="recall", id="q1", question="What does ls do?",
+        options={"A": "List files", "B": "Delete files", "C": "Move files", "D": "Copy files"},
+        correct_option="A", explanation="e", source_page=1, source_quote="s",
+    )
+    letters = Counter()
+    for _ in range(400):
+        shuffle_options(q)
+        assert q.options[q.correct_option] == "List files"
+        letters[q.correct_option] += 1
+    print(sorted(letters.items()))
+    
 #     chunks = ingest("eval/docs/Linux cheatsheet.pdf")
 #     test = generate_test(chunks, n_questions=14, difficulty="understand", skip_first=True)
 #     print(len(test.questions), "questions")
